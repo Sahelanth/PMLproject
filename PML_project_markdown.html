@@ -87,10 +87,9 @@ trainingdata2 &lt;- trainingdata[, colSums(is.na(trainingdata)) &lt; nrow(traini
 trainingdata2 &lt;- trainingdata2[,!names(trainingdata2) %in% 
                                  c(&quot;X&quot;,&quot;user_name&quot;,&quot;raw_timestamp_part_1&quot;,&quot;raw_timestamp_part_2&quot;,&quot;cvtd_timestamp&quot;,&quot;new_window&quot;)]</code></pre>
 <p>Due to the number of rows and puniness of our computer, let’s not mess with k-folds. We’ll cross-validate simply, by creating training and validation subsets from the training data.</p>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Loading required package: lattice
-## Loading required package: ggplot2</code></pre>
-<pre class="r"><code>inTrain &lt;- createDataPartition(y=trainingdata2$classe, p=0.75, list=F)
+<pre class="r"><code>set.seed(7731)
+library(caret)
+inTrain &lt;- createDataPartition(y=trainingdata2$classe, p=0.75, list=F)
 training &lt;- trainingdata2[inTrain,]
 validation &lt;- trainingdata2[-inTrain,]
 
