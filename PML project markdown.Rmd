@@ -1,0 +1,75 @@
+#Predicting Weight-Lifting Technique with Random Forests
+
+We used random forests to predict weight-lifting form, using data from the Human Activity Recognition data set. We built a random forest model after removing columns with NAs from the training data, to reduce computational requirements without losing much information. We split the training data into training and validation subsets to cross-validate; this may give a less reliable estimate of accuracy than using k-folds would, but is less computationally intensive. Our accuracy on the validation data was 98%, so our expected out-of-sample-error should be close to 2%.
+
+```{r, cache=TRUE}
+#Get the data
+if(!file.exists("MLproject")) {
+  dir.create("MLproject")
+}
+setwd("./MLproject")
+
+if (! file.exists('./pml-training.csv')) {
+  download.file('http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv', destfile = './pml-training.csv')
+}
+if (! file.exists('./pml-testing.csv')) {
+  download.file('http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv', destfile = './pml-testing.csv')
+}
+#Make sure all NAs in the data are marked correctly, and read the data in.
+trainingdata <- read.csv('./pml-training.csv', header = TRUE, na.strings = c("NA",""))
+testdata <- read.csv('./pml-testing.csv', header = TRUE, na.strings = c("NA",""))
+
+#Remove columns w/ more than 90% missing values from the set.
+trainingdata2 <- trainingdata[, colSums(is.na(trainingdata)) < nrow(trainingdata) * 0.9]
+
+#Remove columns that we know aren't relevant - trial name, user name, timestamps. Also new_window because it screws up my #attempts to do PCA.
+trainingdata2 <- trainingdata2[,!names(trainingdata2) %in% 
+                                 c("X","user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","new_window")]
+```
+
+Due to the number of rows and puniness of our computer, let's not mess with k-folds. We'll cross-validate simply, by
+creating training and validation subsets from the training data.
+
+```{r, cache=TRUE}
+library(caret)
+inTrain <- createDataPartition(y=trainingdata2$classe, p=0.75, list=F)
+training <- trainingdata2[inTrain,]
+validation <- trainingdata2[-inTrain,]
+
+#We are now down to 54 variables. Let's use principal components to deal with any correlations between them.
+preProc <- preProcess(training[,-54], method="pca", thresh=0.95)
+```
+
+We find that we can capture 95% of the variance in the training set using 19 principal components.
+
+Now let's train a model on those principal components. GLM doesn't work because not all variables are numeric, and we know that random forest is a very accurate method. So, let's do a random forest model.
+```{r, cache=TRUE}
+library(randomForest)
+trainPC <- predict(preProc, training[,-54])
+modelFit <- train(training$classe ~., method = "rf", data = trainPC, trControl = trainControl(method="cv", number=4), importance=T)
+```
+
+Now validate!
+```{r, cache=TRUE}
+validatePC <- predict(preProc, validation[,-54])
+```
+
+Check the accuracy
+```{r, cache=TRUE}
+confusionMatrix(validation$classe, predict(modelFit, validatePC))
+```
+98% accuracy on the validation set!
+
+Now let's test. First, do the same modifications to the test data that we did to the training data.
+```{r, cache=TRUE}
+testdata2 <- testdata[, colSums(is.na(trainingdata)) < nrow(testdata) * 0.9]
+testdata2 <- testdata2[,!names(testdata2) %in% 
+                                 c("X","user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","new_window")]
+```
+
+Now test.
+```{r, cache=TRUE}
+testPC <- predict(preProc, testdata2[,-54])
+testpredict <- predict(modelFit, testPC)
+testpredict
+```
